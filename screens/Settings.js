@@ -14,11 +14,22 @@ import { getData, storeData } from "./data";
 import { Actions } from "react-native-router-flux";
 import { BleManager } from "react-native-ble-plx";
 import base64 from "react-native-base64";
-
+import {
+	Input,
+	Icon,
+	IndexPath,
+	Layout,
+	Select,
+	SelectItem,
+	TopNavigation,
+	TopNavigationAction,
+	Button,
+} from "@ui-kitten/components";
 var bluetooth_on = false;
-export default function Settings(props) {
-	const [time, setTime] = useState(props.product.time);
-	const [password, setPassword] = useState(props.product.password);
+export default function Settings({ route, navigation }) {
+	const { product } = route.params;
+	const [time, setTime] = useState(product.time);
+	const [password, setPassword] = useState(product.password);
 	const [processing, setProcessing] = useState(false);
 	const [message, setMessage] = useState("");
 	const [cdevice, setCdevice] = useState(null);
@@ -169,8 +180,13 @@ export default function Settings(props) {
 							writeData(device).then(() => {
 								setMessage("Sent");
 								setTimeout(() => {
-									setProcessing(false);
-								}, 500);
+									setMessage("");
+									manager.cancelDeviceConnection(device.id).then(
+										(device) => {},
+										(error) => {}
+									);
+									navigation.goBack();
+								}, 1000);
 							});
 						})
 						.then(() => {
@@ -179,7 +195,7 @@ export default function Settings(props) {
 						});
 					const sub = device.onDisconnected((error, device) => {
 						console.log("disconnected");
-						setProcessing(false);
+						setMessage("");
 						//setConnectedDevice(null);
 						//sub.remove();
 					});
@@ -208,7 +224,7 @@ export default function Settings(props) {
 			services[0].uuid,
 			charactertistics[0].uuid,
 			base64.encode(
-				`{time: ${time}, password: ${password}, product_id: ${props.product.product_id}}`
+				`{time: ${time}, password: ${password}, product_id: ${product.product_id}}`
 			)
 		);
 		console.log(services);
@@ -235,35 +251,81 @@ export default function Settings(props) {
 		return device;
 	};
 
+	const BackIcon = (props) => <Icon {...props} name="arrow-back" />;
+	const renderBackAction = () => (
+		<TopNavigationAction
+			icon={BackIcon}
+			onPress={() => {
+				navigation.goBack();
+			}}
+		/>
+	);
+	const StarIcon = (props) => <Icon {...props} name="star" />;
+
+	const saveSettings = () => {
+		if (password.length == 5) {
+			setMessage("Saving Data ...");
+			getData("products").then(function (value) {
+				if (value != null) {
+					for (val in value) {
+						if (value[val].product_id === product.product_id) {
+							console.log("duplicate product");
+							value[val].time = time;
+							value[val].password = password;
+							storeData(value, "products").then(function () {
+								//scanner.current.reactivate();
+								setMessage("Sending Data ... ");
+								//console.log();
+								sendData();
+								// writeData(cdevice).then(() => {
+								// 	setMessage("Sent.");
+								// 	manager.cancelDeviceConnection(cdevice.id).then(
+								// 		() => {
+								// 			console.log("cancelled");
+								// 		},
+								// 		(error) => {
+								// 			console.log("error cancelling");
+								// 		}
+								// 	);
+								// 	Actions.pop();
+								// });
+							});
+							return;
+						}
+					}
+				}
+			});
+		}
+	};
 	return (
-		<View style={styles.container}>
-			<Modal animationType="slide" transparent={true} visible={processing}>
+		<Layout style={styles.container} level="1">
+			<Modal
+				animationType="slide"
+				transparent={true}
+				visible={message.length > 0}
+			>
 				<View style={styles.centeredView}>
 					<View style={styles.modalView}>
 						<Text style={styles.modalText}>{message}</Text>
 					</View>
 				</View>
 			</Modal>
-			{/* <View style={[styles.container_1, styles.horizontal]}>
-				<ActivityIndicator
-					size="small"
-					color="#0000ff"
-					animating={processing}
-				/>
-			</View> */}
-			<TextInput
-				style={styles.input}
-				underlineColorAndroid="transparent"
-				placeholder="Password"
-				placeholderTextColor="#ccc"
+			<TopNavigation
+				alignment="center"
+				title="Update Settings"
+				subtitle="Add time and password to shower"
+				accessoryLeft={renderBackAction}
+			/>
+			<Input
+				placeholder="Enter 5 digit Password"
+				keyboardType="number-pad"
+				value={password}
+				onChangeText={(nextValue) => setPassword(nextValue)}
 				autoCapitalize="none"
 				secureTextEntry={true}
 				maxLength={5}
-				value={password}
-				onChangeText={(text) => setPassword(text)}
-				keyboardType="number-pad"
+				underlineColorAndroid="transparent"
 			/>
-
 			<Picker
 				selectedValue={time}
 				style={styles.picker}
@@ -279,55 +341,55 @@ export default function Settings(props) {
 				<Picker.Item label="45 min" value="45" />
 				<Picker.Item label="60 min" value="60" />
 			</Picker>
+			<Button status="primary" accessoryLeft={StarIcon} onPress={saveSettings}>
+				Save Settings
+			</Button>
+		</Layout>
+	);
+	// <View style={styles.container}>
 
-			<TouchableOpacity
+	{
+		/* <View style={[styles.container_1, styles.horizontal]}>
+				<ActivityIndicator
+					size="small"
+					color="#0000ff"
+					animating={processing}
+				/>
+			</View> */
+	}
+
+	{
+		/* <TextInput
+				style={styles.input}
+				underlineColorAndroid="transparent"
+				placeholder="Password"
+				placeholderTextColor="#ccc"
+				autoCapitalize="none"
+				secureTextEntry={true}
+				maxLength={5}
+				value={password}
+				onChangeText={(text) => setPassword(text)}
+				keyboardType="number-pad"
+			/> */
+	}
+
+	{
+		/* <TouchableOpacity
 				style={styles.submitButton}
 				onPress={() => {
-					if (password.length == 5) {
-						setProcessing(true);
-						setMessage("Saving Data ...");
-						getData("products").then(function (value) {
-							if (value != null) {
-								for (val in value) {
-									if (value[val].product_id === props.product.product_id) {
-										console.log("duplicate product");
-										value[val].time = time;
-										value[val].password = password;
-										storeData(value, "products").then(function () {
-											//scanner.current.reactivate();
-											setMessage("Sending Data ... ");
-											//console.log();
-											sendData();
-											// writeData(cdevice).then(() => {
-											// 	setMessage("Sent.");
-											// 	manager.cancelDeviceConnection(cdevice.id).then(
-											// 		() => {
-											// 			console.log("cancelled");
-											// 		},
-											// 		(error) => {
-											// 			console.log("error cancelling");
-											// 		}
-											// 	);
-											// 	Actions.pop();
-											// });
-										});
-										return;
-									}
-								}
-							}
-						});
-					}
+					
 				}}
 			>
 				<Text style={styles.submitButtonText}> Submit </Text>
 			</TouchableOpacity>
-		</View>
-	);
+		</View> */
+	}
 }
 
 const styles = StyleSheet.create({
 	container: {
-		paddingTop: 23,
+		flex: 1,
+		paddingTop: 20,
 	},
 	input: {
 		marginHorizontal: 15,
